@@ -8,9 +8,39 @@ output:
 
 ## Loading and preprocessing the data
 
+Loading necessary libraries:
+```{r}
+suppressMessages({
+    library(readr)
+    library(dplyr)
+    library(ggplot2)
+})
+```
+Read the data file and create a summarised version per day:
+```{r}
+activity <- read_csv("activity.zip", col_types = cols(date = col_date(format = "%Y-%m-%d"), 
+                                                      interval = col_number(), steps = col_number()))
+daily_activity <- activity %>% group_by(date) %>% summarise(steps = sum(steps))
+```
+
 
 
 ## What is mean total number of steps taken per day?
+```{r}
+ggplot(daily_activity, aes(x = steps)) + 
+    geom_histogram(fill = "lightblue", colour = "white", bins = 30, na.rm = TRUE) +
+    xlab("Total steps per day")
+```
+
+The mean total number of steps per day is
+```{r}
+mean(daily_activity$steps, na.rm = TRUE)
+```
+
+The median number of steps per day is
+```{r}
+median(daily_activity$steps, na.rm = TRUE)
+```
 
 
 
