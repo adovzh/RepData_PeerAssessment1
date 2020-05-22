@@ -16,11 +16,18 @@ suppressMessages({
     library(ggplot2)
 })
 ```
-Read the data file and create a summarised version per day:
+Read the data file and create summarised versions per day and per interval:
 ```{r}
-activity <- read_csv("activity.zip", col_types = cols(date = col_date(format = "%Y-%m-%d"), 
-                                                      interval = col_number(), steps = col_number()))
+activity <- read_csv("activity.zip", 
+                     col_types = cols(date = col_date(format = "%Y-%m-%d"), 
+                                      interval = col_number(), 
+                                      steps = col_number()))
+# activity per day
 daily_activity <- activity %>% group_by(date) %>% summarise(steps = sum(steps))
+# activity per interval with an added time column
+interval_activity <- activity %>% group_by(interval) %>% 
+  summarise(average_steps = mean(steps, na.rm = TRUE)) %>%
+  mutate(time = as.POSIXct(strptime(sprintf("%04d", interval), "%H%M")))
 ```
 
 
@@ -28,7 +35,8 @@ daily_activity <- activity %>% group_by(date) %>% summarise(steps = sum(steps))
 ## What is mean total number of steps taken per day?
 ```{r}
 ggplot(daily_activity, aes(x = steps)) + 
-    geom_histogram(fill = "lightblue", colour = "white", bins = 30, na.rm = TRUE) +
+    geom_histogram(fill = "lightblue", colour = "white", bins = 30, 
+                   na.rm = TRUE) +
     xlab("Total steps per day")
 ```
 
@@ -45,11 +53,71 @@ median(daily_activity$steps, na.rm = TRUE)
 
 
 ## What is the average daily activity pattern?
+Below you can see the time series plot of the average number of steps taken
+in the certain time of the day.
+```{r}
+ggplot(interval_activity, aes(x = time, y = average_steps)) +
+  geom_line() + 
+  scale_x_datetime(date_labels = "%H:%M", date_breaks = "2 hours") +
+  xlab("Time of the day") + 
+  ylab("Average number of steps")
+```
+
+```{r}
+# dataset with the maximum number of steps
+max_interval <- interval_activity %>% 
+  filter(average_steps == max(average_steps))
+# the following variables are inlined in the text statement below
+max_average_steps <- sprintf("%.0f", max_interval$average_steps)
+max_time <- format(max_interval$time, format="%H:%M")
+
+# Text below is generated as:
+# The interval when the most number of steps (`r max_average_steps` on average) 
+# happens at `r max_time`.
+```
 
 
+The interval when the most number of steps (`r max_average_steps` on average) 
+happens at `r max_time`.
 
 ## Imputing missing values
+Total number of the missing values in the dataset:
+```{r}
+activity %>% filter_all(any_vars(is.na(.))) %>% count() %>% pull()
+```
+I am going to use "average per the 5-minute interval" strategy for filling in 
+missing values as the most reasonable one in my opinion.
+```{r}
+# clean version of activity dataset with NAs filled in
+activity_cl <- activity %>% group_by(interval) %>% 
+  mutate(steps = tidyr::replace_na(steps, mean(steps, na.rm = TRUE))) %>% ungroup()
+# activity per day
+daily_activity_cl <- activity_cl %>% group_by(date) %>% 
+  summarise(steps = sum(steps))
+# histogram of the total number of steps taken each day
+ggplot(daily_activity_cl, aes(x = steps)) + 
+    geom_histogram(fill = "lightblue", colour = "white", bins = 30, 
+                   na.rm = TRUE) +
+    xlab("Steps") +
+    ggtitle("Total number of steps taken each day")
 
+```
 
+The mean total number of steps per day is
+```{r}
+mean(daily_activity_cl$steps)
+```
+
+The median number of steps per day is
+```{r}
+median(daily_activity_cl$steps)
+```
+
+As we can see, the strategy of replacing missing values with their averages 
+per interval led to a distribution not much dissimilar to the one with
+missing values removed, but more centered around the mean.
+
+Mean and median of the original distribution were not much different 
+in the first place, replacing missing values with averages made them identical.
 
 ## Are there differences in activity patterns between weekdays and weekends?
